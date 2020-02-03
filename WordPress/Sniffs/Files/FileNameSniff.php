@@ -171,42 +171,56 @@ class FileNameSniff extends Sniff {
 
 		$fileName = basename( $file );
 		$expected = strtolower( str_replace( '_', '-', $fileName ) );
+		$has_class = $this->phpcsFile->findNext( \T_CLASS, $stackPtr );
 
 		/*
-		 * Generic check for lowercase hyphenated file names.
+		 * We leave PHP PSR-4 ClassNamesInStudlyCapsAsIs. So if it's a class we don't check if for lowercase file name.
 		 */
-		if ( $fileName !== $expected && ( false === $this->is_theme || 1 !== preg_match( self::THEME_EXCEPTIONS_REGEX, $fileName ) ) ) {
-			$this->phpcsFile->addError(
-				'Filenames should be all lowercase with hyphens as word separators. Expected %s, but found %s.',
-				0,
-				'NotHyphenatedLowercase',
-				array( $expected, $fileName )
-			);
-		}
-		unset( $expected );
+		
+		if ( false === $has_class ) {
+			/*
+			 * Generic check for lowercase hyphenated file names.
+			 */
+			if ( $fileName !== $expected && ( false === $this->is_theme || 1 !== preg_match( self::THEME_EXCEPTIONS_REGEX, $fileName ) ) ) {
+				$this->phpcsFile->addError(
+					'Filenames should be all lowercase with hyphens as word separators. Expected %s, but found %s.',
+					0,
+					'NotHyphenatedLowercase',
+					array( $expected, $fileName )
+				);
+			}
+			unset( $expected );
+		}	
 
 		/*
 		 * Check files containing a class for the "class-" prefix and that the rest of
 		 * the file name reflects the class name.
 		 */
 		if ( true === $this->strict_class_file_names ) {
-			$has_class = $this->phpcsFile->findNext( \T_CLASS, $stackPtr );
-			if ( false !== $has_class && false === $this->is_test_class( $has_class ) ) {
-				$class_name = $this->phpcsFile->getDeclarationName( $has_class );
-				$expected   = 'class-' . strtolower( str_replace( '_', '-', $class_name ) );
+			
+			/*
+			 * We now check for class-class_name only in core WP files and not in wp-content.
+			 * So our plugins\themes classes can follow PSR-4 naming convention.
+			 */
 
-				if ( substr( $fileName, 0, -4 ) !== $expected && ! isset( $this->class_exceptions[ $fileName ] ) ) {
-					$this->phpcsFile->addError(
-						'Class file names should be based on the class name with "class-" prepended. Expected %s, but found %s.',
-						0,
-						'InvalidClassFileName',
-						array(
-							$expected . '.php',
-							$fileName,
-						)
-					);
+			if ( false === strpos( $file, \DIRECTORY_SEPARATOR . 'wp-content' . \DIRECTORY_SEPARATOR ) ) {
+				if ( false !== $has_class && false === $this->is_test_class( $has_class ) ) {
+					$class_name = $this->phpcsFile->getDeclarationName( $has_class );
+					$expected   = 'class-' . strtolower( str_replace( '_', '-', $class_name ) );
+
+					if ( substr( $fileName, 0, -4 ) !== $expected && ! isset( $this->class_exceptions[ $fileName ] ) ) {
+						$this->phpcsFile->addError(
+							'Class file names should be based on the class name with "class-" prepended. Expected %s, but found %s.',
+							0,
+							'InvalidClassFileName',
+							array(
+								$expected . '.php',
+								$fileName,
+							)
+						);
+					}
+					unset( $expected );
 				}
-				unset( $expected );
 			}
 		}
 
